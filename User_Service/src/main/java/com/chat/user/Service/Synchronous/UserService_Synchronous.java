@@ -1,14 +1,16 @@
-package com.chat.user.Service;
+package com.chat.user.Service.Synchronous;
 
 import com.chat.user.Model.User;
 import com.chat.user.Payload.UpdateUserDetails;
 import com.chat.user.Payload.UserDto;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
-@Service
-public interface UserService {
+
+
+public interface UserService_Synchronous {
 
     UserDto registerUser(UserDto userDto);
 
@@ -18,10 +20,10 @@ public interface UserService {
 
     UserDto findUserById(long id);
 
-    List<User> searchUsersByUsername(String username);
-
+    List<UserDto> searchUsersByUsername(String username);
 
     User dtoToUser(UserDto userDto);
 
     UserDto userToDto(User user);
 }
+

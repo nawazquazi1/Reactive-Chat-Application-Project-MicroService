@@ -1,4 +1,4 @@
-package com.chat.user.Service.impl;
+package com.chat.user.Service.Synchronous.impl;
 
 import com.chat.user.Config.AppConstants;
 import com.chat.user.Exception.EmailAlreadyExistsException;
@@ -8,14 +8,16 @@ import com.chat.user.Model.Role;
 import com.chat.user.Model.User;
 import com.chat.user.Payload.UpdateUserDetails;
 import com.chat.user.Payload.UserDto;
-import com.chat.user.Repositories.RoleRepositories;
-import com.chat.user.Repositories.UserRepositories;
-import com.chat.user.Service.UserService;
+import com.chat.user.Repositories.Synchronous.RoleRepositories_Syn;
+import com.chat.user.Repositories.Synchronous.UserRepositories_Syn;
+import com.chat.user.Service.Synchronous.UserService_Synchronous;
 import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
+import lombok.NoArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -24,37 +26,44 @@ import java.util.List;
 
 @Service
 @AllArgsConstructor
+@NoArgsConstructor
 @Transactional
-public class UserServiceImpl implements UserService {
+@Qualifier("SyncService")
+public class UserServiceImpl_Synchronous implements UserService_Synchronous {
 
-    private static final Logger log = LoggerFactory.getLogger(UserServiceImpl.class);
-    private UserRepositories userRepositories;
-    private RoleRepositories roleRepositories;
-//    private PasswordEncoder PasswordEncoder;
+    private static final Logger log = LoggerFactory.getLogger(UserServiceImpl_Synchronous.class);
+    private UserRepositories_Syn userRepositories;
+    private RoleRepositories_Syn roleRepositories;
+    //    private PasswordEncoder PasswordEncoder;
     private ModelMapper modelMapper;
-
 
     @Override
     public UserDto registerUser(UserDto userDto) {
-        log.info("registering user {}", userDto.getUsername());
-        if (userRepositories.existsByUsername(userDto.getUsername())) {
-            printLogWarn(userDto.getUsername());
+        // Check if username already exists
+        if (this.userRepositories.existsByUsername(userDto.getUsername())) {
+            log.warn("Username {} already exists", userDto.getUsername());
             throw new UserNameAlreadyExistsException(
-                    String.format("username %s already exists", userDto.getUsername()));
+                    String.format("Username %s already exists", userDto.getUsername()));
         }
 
-        if (userRepositories.existsByEmail(userDto.getEmail())) {
-            this.printLogWarn(userDto.getEmail());
+        // Check if email already exists
+        if (this.userRepositories.existsByEmail(userDto.getEmail())) {
+            log.warn("Email {} already exists", userDto.getEmail());
             throw new EmailAlreadyExistsException(
-                    String.format("email %s already exists", userDto.getEmail()));
+                    String.format("Email %s already exists", userDto.getEmail()));
         }
 
+        // Proceed with role and user creation
         userDto.setActive(true);
-//        userDto.setPassword(PasswordEncoder.encode(userDto.getPassword()));
-        Role role = this.roleRepositories.findById(AppConstants.APP_USER).orElseThrow();
+
+        Role role = this.roleRepositories.findById(AppConstants.APP_USER)
+                .orElseThrow(() -> new RuntimeException("Default role not found"));
         userDto.getRoles().add(role);
-        User user = this.dtoToUser(userDto);
-        return this.userToDto(this.userRepositories.save(user));
+
+        User user = dtoToUser(userDto);
+        user = this.userRepositories.save(user);
+
+        return this.userToDto(user);
     }
 
     @Override
@@ -89,13 +98,13 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public List<User> searchUsersByUsername(String username) {
-        return this.userRepositories.findByUsernameOrUsernameStartsWith(username, username);
+    public List<UserDto> searchUsersByUsername(String username) {
+        return Collections.singletonList(this.modelMapper.map(this.userRepositories.findByUsernameOrUsernameStartsWith(username, username), UserDto.class));
     }
 
     @Override
     public User dtoToUser(UserDto userDto) {
-        User user= this.modelMapper.map(userDto, User.class);
+        User user = this.modelMapper.map(userDto, User.class);
         user.setCreatedAt(Instant.now());
         return user;
     }
@@ -104,6 +113,7 @@ public class UserServiceImpl implements UserService {
     public UserDto userToDto(User user) {
         return this.modelMapper.map(user, UserDto.class);
     }
+
 
     private void printLogWarn(String message) {
         log.warn("user {} already exists", message);
